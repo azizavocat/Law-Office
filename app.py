@@ -46,7 +46,7 @@ def check_password():
 if check_password():
     st.set_page_config(page_title="مكتب الأستاذ برادي عزيز", layout="wide")
 
-    # ثوابت البيانات القانونية
+    # ثوابت البيانات القانونية (نفس تقسيماتك الأصلية)
     SECTIONS_MAP = {
         "civil": ["المدني", "العقاري", "شؤون الأسرة", "التجاري", "الاجتماعي", "الاستعجالي"],
         "criminal": ["جنحة", "جناية", "مخالفة", "تحقيق", "غرفة الاتهام"],
@@ -55,7 +55,7 @@ if check_password():
         "appeals": ["استئناف (عادي)", "معارضة (عادي)", "نقض (غير عادي)", "التماس إعادة النظر"],
         "study": ["استشارة", "إعداد عريضة", "مراجعة ملف"]
     }
-    OUTCOMES = ["جارية", "قيد الدراسة", "لجواب الخصم", "لجوابنا", "للمداولة", "للتحقيق", "تبليغ عريضة", "حكم نهائي", "محكومة"]
+    OUTCOMES = ["جارية", "قيد الدراسة", "لجواب الخصم", "لجوابنا", "للمداولة", "للتحقيق", "حكم نهائي", "محكومة"]
 
     # دالات إدارة البيانات
     def load_data():
@@ -87,46 +87,46 @@ if check_password():
 
     # --- 1. جدول القضايا ---
     if choice == "📊 جدول القضايا":
-        st.subheader("📋 القضايا الجارية والبحث")
+        st.subheader("📋 القضايا الجارية")
         if not cases:
-            st.info("لا توجد قضايا مسجلة حالياً.")
+            st.info("لا توجد قضايا مسجلة.")
         else:
             df = pd.DataFrame(cases)
             ongoing = df[~df['status'].isin(["حكم نهائي", "محكومة"])]
-            search = st.text_input("🔍 ابحث عن اسم موكل أو رقم قضية:")
+            search = st.text_input("🔍 بحث سريع:")
             if search:
                 ongoing = ongoing[ongoing.astype(str).apply(lambda x: search in x.values, axis=1)]
             st.dataframe(ongoing[["num", "year", "moakal", "khasm", "date", "status", "sec", "action"]], use_container_width=True)
 
     # --- 2. إضافة وتعديل الملفات ---
     elif choice == "➕ إضافة/تعديل ملف":
-        st.subheader("📝 تسجيل أو تحديث ملف قضية")
+        st.subheader("📝 إدارة الملفات")
         with st.form("case_form"):
             col1, col2 = st.columns(2)
             with col1:
                 num = st.text_input("رقم القضية")
                 year = st.text_input("السنة", value=str(datetime.now().year))
                 moakal = st.text_input("اسم الموكل")
-                mode = st.selectbox("نوع التبويب", list(SECTIONS_MAP.keys()))
+                mode = st.selectbox("التبويب", list(SECTIONS_MAP.keys()))
             with col2:
-                khasm = st.text_input("اسم الخصم")
-                sec = st.selectbox("القسم/الفرع", SECTIONS_MAP[mode])
-                date = st.text_input("تاريخ الجلسة", value=datetime.now().strftime("%d/%m/%Y"))
-                status = st.selectbox("وضعية القضية", OUTCOMES)
-            action = st.text_area("الملاحظات والإجراءات")
+                khasm = st.text_input("الخصم")
+                sec = st.selectbox("الفرع", SECTIONS_MAP[mode])
+                date = st.text_input("الجلسة", value=datetime.now().strftime("%d/%m/%Y"))
+                status = st.selectbox("الحالة", OUTCOMES)
+            action = st.text_area("الإجراء المتخذ")
             
             if st.form_submit_button("✅ حفظ"):
                 if num and moakal:
-                    new_case = {"num": num, "year": year, "moakal": moakal, "khasm": khasm, "type": mode, "sec": sec, "date": date, "status": status, "action": action, "total_agreed": 0, "payments_list": []}
+                    new_case = {"num": num, "year": year, "moakal": moakal, "khasm": khasm, "type": mode, "sec": sec, "date": date, "status": status, "action": action, "total_agreed": target.get('total_agreed', 0) if 'target' in locals() else 0, "payments_list": []}
                     cases = [c for c in cases if not (c['num'] == num and c['year'] == year)]
                     cases.append(new_case)
                     save_data(cases)
-                    st.success("تم الحفظ!")
-                else: st.error("أكمل البيانات الأساسية.")
+                    st.success("تم الحفظ بنجاح!")
+                else: st.error("يرجى ملأ البيانات الأساسية")
 
     # --- 3. النظام المالي ---
     elif choice == "💰 المالية والأتعاب":
-        st.subheader("💵 تتبع المستحقات المالية")
+        st.subheader("💵 تتبع الأتعاب")
         if cases:
             names = [f"{c['num']}/{c['year']} - {c['moakal']}" for c in cases]
             sel_case_name = st.selectbox("اختر ملف الموكل:", names)
@@ -134,20 +134,19 @@ if check_password():
             
             col1, col2, col3 = st.columns(3)
             with col1:
-                target['total_agreed'] = st.number_input("إجمالي الاتفاق (دج)", value=float(target.get('total_agreed', 0)))
+                target['total_agreed'] = st.number_input("الاتفاق الكلي", value=float(target.get('total_agreed', 0)))
             with col2:
                 paid_sum = sum(p['amount'] for p in target.get('payments_list', []))
-                st.metric("المبلغ المحصل", f"{paid_sum:,.2f}")
+                st.metric("المحصل", f"{paid_sum:,.2f}")
             with col3:
-                st.metric("الديون المتبقية", f"{(target['total_agreed'] - paid_sum):,.2f}")
+                st.metric("المتبقي", f"{(target['total_agreed'] - paid_sum):,.2f}")
             
-            new_pay = st.number_input("تسجيل دفعة جديدة (دج)", min_value=0.0)
-            if st.button("💵 حفظ الدفعة"):
-                if new_pay > 0:
-                    target['payments_list'].append({"amount": new_pay, "date": datetime.now().strftime("%d/%m/%Y %H:%M")})
-                    save_data(cases)
-                    st.success("تم!")
-                    st.rerun()
+            new_pay = st.number_input("دفعة جديدة", min_value=0.0)
+            if st.button("حفظ الدفعة"):
+                target['payments_list'].append({"amount": new_pay, "date": datetime.now().strftime("%d/%m/%Y")})
+                save_data(cases)
+                st.success("تم!")
+                st.rerun()
 
     # --- 4. الأرشيف ---
     elif choice == "📁 الأرشيف":
@@ -159,11 +158,11 @@ if check_password():
 
     # --- 5. الإعدادات ---
     elif choice == "⚙️ الإعدادات":
-        st.subheader("⚙️ الإعدادات")
-        old_p = st.text_input("الحالية", type="password")
-        new_p = st.text_input("الجديدة", type="password")
-        if st.button("تغيير"):
+        st.subheader("⚙️ تغيير كلمة السر")
+        old_p = st.text_input("كلمة السر الحالية", type="password")
+        new_p = st.text_input("كلمة السر الجديدة", type="password")
+        if st.button("تحديث"):
             if old_p == get_password():
                 save_password(new_p)
-                st.success("تم التغيير!")
-            else: st.error("خطأ!")
+                st.success("تم التغيير بنجاح!")
+            else: st.error("كلمة المرور الحالية خاطئة")
